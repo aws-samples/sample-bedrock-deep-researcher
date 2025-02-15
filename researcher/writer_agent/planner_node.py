@@ -17,7 +17,7 @@ class Outline(BaseModel):
     date: str
 
 
-class PlannerAgent:
+class PlannerNode:
 
     SYSTEM_PROMPT = (
         "You are a research editor. Your goal is to oversee the research project "

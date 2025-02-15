@@ -1,6 +1,6 @@
 import pytest
 
-from beano.model import BedrockModel
+from researcher.model import BedrockModel
 
 
 class TestModel:

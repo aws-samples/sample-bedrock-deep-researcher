@@ -1,4 +1,5 @@
 import logging
+import os
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 from uuid import UUID
@@ -9,13 +10,10 @@ from langchain_core.outputs.llm_result import LLMResult
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, StateGraph
 
-from beano.researcher.retrievers.retrievers import RetrieverType
-
 from .model import ResearchState
-from .planner_agent import PlannerAgent
-from .publisher_agent import PublisherAgent
-from .research_agent import ResearchAgent
-from .writer_agent import WriterAgent
+from .planner_node import PlannerNode
+from .research_node import ResearchNode
+from .writer_node import WriterNode
 
 logger = logging.getLogger(__name__)
 
@@ -55,15 +53,14 @@ class TokenCounterHandler(BaseCallbackHandler):
             self.output_tokens += g.message.usage_metadata["output_tokens"]
 
 
-class TechnicalWriter:
+class WriterAgent:
 
-    def __init__(self, model_id, retriever: RetrieverType):
+    def __init__(self, model_id):
         self.model_id = model_id
         self.model = ChatBedrock(
             model_id=model_id, streaming=True, temperature=0)
         self.token_counter = TokenCounterHandler()
-        self.retriever = retriever
-        self.agents = self._init_agents(retriever)
+        self.agents = self._init_agents()
 
         self.workflow = self._create_workflow()
         checkpointer = MemorySaver()
@@ -71,12 +68,11 @@ class TechnicalWriter:
         self.graph = self.workflow.compile(
             checkpointer=checkpointer, interrupt_before=["human_plan_feedback"])
 
-    def _init_agents(self, retriever: RetrieverType) -> Dict[str, Any]:
+    def _init_agents(self) -> Dict[str, Any]:
         return {
-            "research_agent": ResearchAgent(self.model_id, retriever),
-            "planner": PlannerAgent(self.model),
-            "writer": WriterAgent(self.model),
-            # "publisher": PublisherAgent()
+            "research_agent": ResearchNode(llm_model_id="amazon.nova-lite-v1:0", tavily_access_key=os.environ["TAVILY_API_KEY"]),
+            "planner": PlannerNode(self.model),
+            "writer": WriterNode(self.model),
         }
 
     def _create_workflow(self):

@@ -1,9 +1,9 @@
+import logging
 import os
 import random
 import time
 import uuid
 from functools import wraps
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +32,8 @@ def exponential_backoff_retry(
                 except ExceptionToCheck as e:
 
                     if attempt == max_retries:
-                        logger.error(f"Execution failed after {attempt} attempts")
+                        logger.error(
+                            f"Execution failed after {attempt} attempts")
                         raise e
 
                     # Add jitter to avoid thundering herd problem

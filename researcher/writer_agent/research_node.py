@@ -1,48 +1,21 @@
 
 import logging
-import os
-from typing import List, Optional
 
-from pydantic import BaseModel
-
-from beano.researcher import Researcher, ResearcherConfig
-from beano.researcher.retrievers.retrievers import RetrieverType
+from researcher.writer_agent.researcher import Researcher
 
 from .model import Section
-from .utils import exponential_backoff_retry
 
 logger = logging.getLogger(__name__)
 
 
-class Queries(BaseModel):
-    queries: List[str]
+class ResearchNode:
 
-
-class ResearchContent(BaseModel):
-    content: str
-    references: List[str]
-
-
-class ResearchAgent:
-
-    def __init__(self, model, retriever: RetrieverType = RetrieverType.GOOGLE):
-        self.model = model
-        self.config = ResearcherConfig(
-            llm_model_id=model,
-            retrievers=[retriever],
-            retrievers_config={
-                "tavily_access_key": os.environ["TAVILY_API_KEY"]
-            }
-        )
+    def __init__(self, llm_model_id, tavily_access_key):
         self.input_tokens = 0
         self.output_tokens = 0
         self.execution_time_in_seconds = 0
-        self.researcher = Researcher(config=self.config)
-
-    @exponential_backoff_retry(Exception)
-    def _invoke_model(self, messages) -> Optional[Queries]:
-        """Invoke the model with retry logic for ServiceUnavailableError."""
-        return self.model.with_structured_output(Queries).invoke(messages)
+        self.researcher = Researcher(
+            llm_model_id=llm_model_id, tavily_access_key=tavily_access_key)
 
     def run_initial_search(self, state: dict) -> dict:
         """

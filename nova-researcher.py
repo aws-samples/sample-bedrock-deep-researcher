@@ -1,21 +1,19 @@
-# constants.py
 import logging
 
 import pyperclip
 import streamlit as st
 from dotenv import load_dotenv
 
-from beano.article_writer import Task, TechnicalWriter
-from beano.callbacks import get_streamlit_cb
-from beano.model import Article, BedrockModel
-from beano.researcher.retrievers.retrievers import RetrieverType
+from researcher.callbacks import get_streamlit_cb
+from researcher.model import Article, BedrockModel, Task
+from researcher.writer_agent import WriterAgent
 
 DEFAULT_MODEL_ID = "us.anthropic.claude-3-haiku-20240307-v1:0"
 DEFAULT_MAX_SECTIONS = 3
 DEFAULT_TOPIC = "Upload files using s3 presigned url"
 DEFAULT_REQUIREMENTS = "Provide a detailed explanation and python code samples"
 
-logger = logging.getLogger("beano")
+logger = logging.getLogger("nova-researcher")
 
 
 class StateManager:
@@ -69,72 +67,67 @@ def render_initial_form(state_manager: StateManager, text_spinner_placeholder):
     """
     with st.form("article_form"):
         topic = st.text_area(
-            "Topic",
-            value=DEFAULT_TOPIC,
-            help="Enter the topic you want to write about"
+            "Topic", value=DEFAULT_TOPIC, help="Enter the topic you want to write about"
         )
 
         requirements = st.text_area(
             "Requirements",
             value=DEFAULT_REQUIREMENTS,
-            help="Enter any specific requirements for the article"
+            help="Enter any specific requirements for the article",
         )
 
         max_sections = st.number_input(
             "Maximum number of sections",
             min_value=1,
             max_value=10,
-            value=DEFAULT_MAX_SECTIONS
+            value=DEFAULT_MAX_SECTIONS,
         )
 
-        retriever = st.selectbox(
-            'Select your Search Engine', RetrieverType.list())
-
         model_id = st.selectbox(
-            'Select your Model', BedrockModel.list_inference_profiles(), format_func=lambda x: BedrockModel.get_by_model_id(x).value
+            "Select your Model",
+            BedrockModel.list_inference_profiles(),
+            format_func=lambda x: BedrockModel.get_by_model_id(x).value,
         )
 
         submitted = st.form_submit_button("Generate Article", type="primary")
 
         if submitted:
-            logger.info(f"generate_article on '{
-                topic}' following '{requirements}'")
+            logger.info(
+                f"generate_article on '{topic}' following '{requirements}'")
 
             logger.info(f"Using model: {model_id}")
-            logger.info(f"Using retriever: {retriever}")
             if not topic:
                 st.session_state.text_error = "Please enter a topic"
                 return
 
             if not requirements:
-                st.session_state.text_error = "Please enter your requirements for the article"
+                st.session_state.text_error = (
+                    "Please enter your requirements for the article"
+                )
                 return
 
-            state_manager.writer = TechnicalWriter(
-                model_id=model_id,
-                retriever=RetrieverType(retriever)
-            )
+            state_manager.writer = WriterAgent(model_id=model_id)
 
             state_manager.task = Task(
-                topic=topic,
-                max_sections=max_sections,
-                requirements=requirements
+                topic=topic, max_sections=max_sections, requirements=requirements
             )
 
             with text_spinner_placeholder:
-                with st.spinner("Please wait while the article outline is being generated..."):
+                with st.spinner(
+                    "Please wait while the article outline is being generated..."
+                ):
                     response = state_manager.writer.run(
                         task=state_manager.task,
                         task_id="1",
-                        callables=[st.session_state.cb_handler]
+                        callables=[st.session_state.cb_handler],
                     )
 
                     article = Article(
-                        title=response.get('title'),
-                        sections=response.get('sections'),
-                        date=response.get('date'),
+                        title=response.get("title"),
+                        sections=response.get("sections"),
+                        date=response.get("date"),
                         introduction="",
-                        conclusions=""
+                        conclusions="",
                     )
 
                     st.session_state.article = article.render_outline()
@@ -142,7 +135,9 @@ def render_initial_form(state_manager: StateManager, text_spinner_placeholder):
                     st.rerun()
 
 
-def render_outline_feedback(state_manager: StateManager, article_container, text_spinner_placeholder):
+def render_outline_feedback(
+    state_manager: StateManager, article_container, text_spinner_placeholder
+):
     """
     Renders the article outline and gets user feedback.
     """
@@ -153,7 +148,9 @@ def render_outline_feedback(state_manager: StateManager, article_container, text
 
     st.markdown("Please provide feedback to the outline")
     draft_feedback = st.text_area(
-        label="Feedback", placeholder="Input a feedback to change the title or the sections")
+        label="Feedback",
+        placeholder="Input a feedback to change the title or the sections",
+    )
 
     col1, col2 = st.columns(2)
 
@@ -166,14 +163,17 @@ def render_outline_feedback(state_manager: StateManager, article_container, text
             with text_spinner_placeholder:
                 with st.spinner("Please wait while the article is being generated..."):
                     response = state_manager.writer.provide_human_plan_feedback(
-                        task_id="1", human_feedback=draft_feedback, callables=[st.session_state.cb_handler])
+                        task_id="1",
+                        human_feedback=draft_feedback,
+                        callables=[st.session_state.cb_handler],
+                    )
 
                     article = Article(
-                        title=response.get('title'),
-                        sections=response.get('sections'),
-                        date=response.get('date'),
+                        title=response.get("title"),
+                        sections=response.get("sections"),
+                        date=response.get("date"),
                         introduction="",
-                        conclusions=""
+                        conclusions="",
                     )
 
                     st.session_state.article = article.render_outline()
@@ -188,31 +188,36 @@ def render_outline_feedback(state_manager: StateManager, article_container, text
 
                     while state_manager.writer.get_state(task_id="1").next:
                         response = state_manager.writer.provide_human_plan_feedback(
-                            task_id="1", human_feedback="ok", callables=[st.session_state.cb_handler])
+                            task_id="1",
+                            human_feedback="ok",
+                            callables=[st.session_state.cb_handler],
+                        )
 
                     article = Article(
-                        title=response.get('title'),
-                        sections=response.get('sections'),
-                        date=response.get('date'),
-                        introduction=response.get(
-                            'introduction'),
-                        conclusions=response.get('conclusions')
+                        title=response.get("title"),
+                        sections=response.get("sections"),
+                        date=response.get("date"),
+                        introduction=response.get("introduction"),
+                        conclusions=response.get("conclusions"),
                     )
                     st.session_state.article = article.render_full_article()
                     state_manager.stage = "final_result"
                     st.rerun()
 
 
-def render_final_result(state_manager: StateManager, article_container, token_count_placeholder):
+def render_final_result(
+    state_manager: StateManager, article_container, token_count_placeholder
+):
     """
     Renders the final article with options to copy or start over.
     """
     with token_count_placeholder.container():
         with st.expander("Metadata"):
-            st.write(f"Input Tokens: {
-                     state_manager.writer.token_counter.input_tokens}")
-            st.write(f"Output Tokens: {
-                     state_manager.writer.token_counter.output_tokens}")
+            st.write(
+                f"Input Tokens: {state_manager.writer.token_counter.input_tokens}")
+            st.write(
+                f"Output Tokens: {state_manager.writer.token_counter.output_tokens}"
+            )
             st.write(f"Words: {len(st.session_state.article.split())}")
 
     with article_container.container():
@@ -236,17 +241,21 @@ def render_final_result(state_manager: StateManager, article_container, token_co
     if st.session_state.text_error:
         st.error(st.session_state.text_error)
 
+
 # main.py
 
 
 def main():
-    logging.basicConfig(level=logging.INFO, force=True,
-                        format='%(levelname)s:%(name)s:%(filename)s:%(lineno)d:%(message)s')
+    logging.basicConfig(
+        level=logging.INFO,
+        force=True,
+        format="%(levelname)s:%(name)s:%(filename)s:%(lineno)d:%(message)s",
+    )
     load_dotenv()
 
     state_manager = StateManager()
 
-    st.title("Beano :writing_hand:")
+    st.title("Nova Researcher")
     st.divider()
 
     text_spinner_placeholder = st.empty()
@@ -259,7 +268,8 @@ def main():
         render_initial_form(state_manager, text_spinner_placeholder)
     elif state_manager.stage == "outline_feedback":
         render_outline_feedback(
-            state_manager, article_placeholder, text_spinner_placeholder)
+            state_manager, article_placeholder, text_spinner_placeholder
+        )
     elif state_manager.stage == "final_result":
         render_final_result(
             state_manager, article_placeholder, token_count_placeholder)

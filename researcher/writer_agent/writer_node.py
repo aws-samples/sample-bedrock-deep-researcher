@@ -14,7 +14,7 @@ class IntroductionConclusionSection(BaseModel):
     conclusions: str
 
 
-class WriterAgent:
+class WriterNode:
 
     SYSTEM_PROMPT = (
         "You are an expert technical writer."
@@ -96,7 +96,8 @@ Article text:
         format = task.get("format", "markdown")
 
         self.messages = [
-            SystemMessage(content=self.SYSTEM_PROMPT.format(requirements=requirements))
+            SystemMessage(content=self.SYSTEM_PROMPT.format(
+                requirements=requirements))
         ]
 
         sections = [
@@ -109,7 +110,8 @@ Article text:
                 HumanMessage(
                     content=self.INTRO_PROMPT_OPTIMIZED.format(
                         topic=topic,
-                        article="\n\n".join([section.content for section in sections]),
+                        article="\n\n".join(
+                            [section.content for section in sections]),
                     )
                 )
             ]
