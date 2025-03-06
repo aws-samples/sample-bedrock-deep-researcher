@@ -23,7 +23,7 @@ system_prompt = """You are an expert technical writer tasked to plan an article 
     - research: Boolean value (true/false) indicating if web research is needed
     - content: Empty string (to be filled later)
 5. Introduction and conclusion will not require research because they can distill information from other parts of the article.
-6. If a feedback is provided, use it to improve the outline or the title.
+6. If a user feedback is provided, do not regenerate from scratch the outline or the title but use the feedback to improve the original outline outline or the title.
 7. Return the title and sections as a valid JSON object without any additional text.
 </instructions>
 """
@@ -42,9 +42,7 @@ Use this context to plan the sections of the article:
 {context}
 </Context>
 
-<feedback>
 {feedback}
-</feedback>
 """
 
 
@@ -57,8 +55,8 @@ class ArticleOutlineGenerator:
         topic = state.get("topic", "")
         source_str = state.get("source_str", "")
         feedback = state.get("feedback_on_report_plan", "")
-        if feedback:
-            feedback = f"<Feedback>\nHere is some feedback on article structure from user review:{feedback}\n</Feedback>"
+        # if feedback:
+        # feedback = f"<Feedback>\nHere is some feedback on article structure from user review:{feedback}\n</Feedback>"
 
         configurable = Configuration.from_runnable_config(config)
 
@@ -73,13 +71,11 @@ class ArticleOutlineGenerator:
 
         outline_obj = json.loads(outline_response.content)
 
-        logger.info(f"Outline json: {outline_obj}")
-
         outline = Outline.model_validate(outline_obj, strict=True)
 
         logger.info(f"Generated sections: {outline.sections}")
 
-        return {"title": outline.title, "sections": outline.sections}
+        return {"title": outline.title, "sections": outline.sections, "messages": [("ai", outline.render_outline())]}
 
     def generate_outline(self, model_id: str, max_tokens: int, system_prompt: str, user_prompt: str):
 

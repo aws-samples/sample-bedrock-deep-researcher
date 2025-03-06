@@ -1,56 +1,29 @@
 import logging
 import os
 import uuid
-from datetime import datetime
-from typing import List
 
 import pyperclip
-import pytz
 import streamlit as st
 from dotenv import load_dotenv
-from pydantic import BaseModel, Field
 
 from bedrock_deep_research import BedrockDeepResearch
 from bedrock_deep_research.config import (DEFAULT_TOPIC, SUPPORTED_MODELS,
                                           Configuration)
-from bedrock_deep_research.model import Section
 
 logger = logging.getLogger(__name__)
 LOGLEVEL = os.environ.get("LOGLEVEL", "INFO").upper()
 
 
 default_st_vals = {
+    "messages": [],
+    "topic": "",
+    "outline_msg": "",
     "head_image_path": None,
     "bedrock_deep_research": None,
     "stage": "initial_form",
     "article": "",
     "text_error": ""
 }
-
-
-class Article(BaseModel):
-    title: str = Field(description="Title of the article")
-    date: str = Field(
-        description="Date of the article",
-        default=datetime.now(pytz.UTC).strftime("%Y-%m-%d"),
-    )
-    sections: List[Section] = Field(
-        description="List of sections in the article")
-
-    def render_outline(self) -> str:
-        sections_content = "\n".join(
-            f"{i+1}. {section.name}" for i, section in enumerate(self.sections)
-        )
-        return f"\nTitle: {self.title}\n\n{sections_content}"
-
-    def render_section(self, section: Section) -> str:
-        return f"\n## {section.name}\n\n{section.content}"
-
-    def render_full_article(self) -> str:
-        sections_content = "\n".join(
-            self.render_section(section) for section in self.sections
-        )
-        return f"# {self.title}\n#### Date: {self.date}\n\n{sections_content}"
 
 
 def init_state():
@@ -66,7 +39,7 @@ def render_initial_form():
     """
     try:
         with st.form("article_form"):
-            topic = st.text_area(
+            st.session_state.topic = st.text_area(
                 "Topic",
                 value=DEFAULT_TOPIC,
                 help="Enter the topic you want to write about",
@@ -105,10 +78,10 @@ def render_initial_form():
 
             if submitted:
                 logger.info(
-                    f"generate_article on '{topic}' following '{writing_guidelines}'"
+                    f"generate_article on '{st.session_state.topic}' following '{writing_guidelines}'"
                 )
 
-                if not topic:
+                if not st.session_state.topic:
                     st.session_state.text_error = "Please enter a topic"
                     return
 
@@ -134,163 +107,105 @@ def render_initial_form():
                 )
 
                 with st.session_state.text_spinner_placeholder:
-                    with st.spinner(
-                        "Please wait while the article outline is being generated..."
-                    ):
-                        response = st.session_state.bedrock_deep_research.start(
-                            topic)
-
-                        logger.debug(f"Outline response: {response}")
+                    with st.spinner("Please wait while the article outline is being generated..."):
+                        result = st.session_state.bedrock_deep_research.start(
+                            st.session_state.topic)
 
                         state = st.session_state.bedrock_deep_research.get_state()
 
-                        article = Article(
-                            title=state.values["title"],
-                            sections=state.values["sections"],
-                        )
-                        st.session_state.article = article.render_outline()
+                        last_message = state.values["messages"][-1]
+
+                        logger.info(
+                            f"render_initial_form: Last message: {last_message.content}")
+                        st.markdown(last_message.content)
+                        st.session_state.messages.append(
+                            {"role": "assistant", "content": last_message.content})
+
+                        # for item in result:
+                        #     if isinstance(item, dict) and '__interrupt__' in item:
+                        #         interrupt_obj = item['__interrupt__']
+                        #         st.session_state.messages = [
+                        #             {"role": "assistant", "content": interrupt_obj[0].value}]
+                        #         break
+
+                        logger.info(f"Outline response: {result}")
+
                         st.session_state.stage = "outline_feedback"
                         st.rerun()
+
     except Exception as e:
         logger.error(f"An error occurred: {e}")
         raise
 
 
-def render_outline_feedback(article_container):
+def render_outline_feedback():
     """
     Renders the article outline and gets user feedback.
     """
-    with article_container.container():
-        st.markdown("## Article Outline")
-        st.markdown(st.session_state.article)
+    # message = st.chat_message("assistant")
 
-    st.markdown("Please provide feedback to the outline")
+    for message in st.session_state.messages:
 
-    with st.form("feedback_form"):
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
 
-        feedback = st.text_area(
-            label="Feedback",
-            placeholder="Input a feedback to change the title or the sections",
-        )
+    # message.write(st.session_state.outline_msg)
 
-        col1, col2 = st.columns(2)
+    if prompt := st.chat_input():
+        with st.chat_message("user"):
+            st.write(prompt)
 
-        with col1:
-            submit_feedback_pressed = st.form_submit_button("Submit Feedback")
+        st.session_state.messages.append({"role": "user", "content": prompt})
 
-            if submit_feedback_pressed:
-                on_submit_button_click(feedback)
+        with st.chat_message("assistant"):
+            try:
+                response = st.session_state.bedrock_deep_research.feedback(
+                    prompt)
+                # logger.info(f"Stream: {s.content}")
+                logger.info(f"Response {response}")
 
-        with col2:
-            accept_outline_pressed = st.form_submit_button(
-                "Accept Outline", type="primary"
-            )
+                state = st.session_state.bedrock_deep_research.get_state()
 
-            if accept_outline_pressed:
-                on_accept_outline_button_click()
+                last_message = state.values["messages"][-1]
 
+                logger.info(f"outline: Last message: {last_message.content}")
 
-def render_final_result(article_container):
-    """
-    Renders the final article with options to copy or start over.
-    """
+                if 'head_image_path' in state.values and state.values['head_image_path']:
+                    st.image(state.values['head_image_path'])
 
-    logger.info("render_final_result")
-    logger.info(st.session_state)
+                st.markdown(last_message.content)
+                st.session_state.messages.append(
+                    {"role": "assistant", "content": last_message.content})
+            except Exception as e:
+                logger.error(
+                    f"An error occurred during feedback processing: {str(e)}")
+                st.error(
+                    "An error occurred while processing your request. Please try again.")
 
-    with article_container.container():
+            # for item in response:
+            #     if isinstance(item, dict) and '__interrupt__' in item:
+            #         interrupt_obj = item['__interrupt__']
+            #         st.markdown(interrupt_obj[0].value)
+            #         st.session_state.messages.append(
+            #             {"role": "assistant", "content": interrupt_obj[0].value})
+            #         break
+            #     elif isinstance(item, dict) and 'compile_final_article' in item:
+            #         final_report = item['compile_final_article']['final_report']
 
-        if 'head_image_path' in st.session_state and st.session_state.head_image_path:
-            st.image(st.session_state.head_image_path, width=1200)
+            #         st.markdown(final_report)
+            #         if st.button("Copy to Clipboard", type="primary"):
+            #             st.toast("Article copied to clipboard!")
+            #             pyperclip.copy(final_report)
 
-        st.markdown(st.session_state.article)
-
-    st.divider()
-    col1, col2 = st.columns(2)
-
-    with col1:
-        if st.button("Copy to Clipboard", type="primary"):
-            st.write("Article copied to clipboard!")
-            st.toast("Article copied to clipboard!")
-            pyperclip.copy(st.session_state.article)
-
-    with col2:
-        if st.button("Start Over"):
-            st.session_state.bedrock_deep_research = None
-            st.session_state.stage = "initial_form"
-
-            st.rerun()
-
-    # Display any error messages
-    if st.session_state.text_error:
-        st.error(st.session_state.text_error)
-
-
-def on_submit_button_click(feedback):
-    try:
-        logger.info("Submit feedback pressed")
-        if not feedback:
-            st.session_state.text_error = "Please enter a feedback"
-            return
-
-        with st.session_state.text_spinner_placeholder:
-            with st.spinner("Please wait while your feedback is being processed"):
-                try:
-                    response = st.session_state.bedrock_deep_research.feedback(
-                        feedback)
-
-                    logger.info(f"Feedback response: {response}")
-
-                    state = st.session_state.bedrock_deep_research.get_state()
-
-                    article = Article(
-                        title=state.values["title"], sections=state.values["sections"]
-                    )
-
-                    st.session_state.article = article.render_outline()
-                    st.session_state.text_error = ""
-                    st.rerun()
-                except Exception as e:
-                    st.error(
-                        f"An error occurred while processing feedback: {e}")
-    except Exception as e:
-        logger.error(f"An error occurred: {e}")
-        st.error(f"An error occurred: {e}")
-
-
-def on_accept_outline_button_click():
-    logger.info("Accept outline pressed")
-
-    try:
-        # if st.form_submit_button("Accept Outline", type="primary"):
-        with st.session_state.text_spinner_placeholder:
-            with st.spinner("Please wait while the article is being generated..."):
-                try:
-                    response = st.session_state.bedrock_deep_research.feedback(
-                        True)
-
-                    logger.info(f"Accept outline response: {response}")
-
-                    state = st.session_state.bedrock_deep_research.get_state()
-
-                    st.session_state.head_image_path = state.values["head_image_path"]
-                    st.session_state.article = state.values["final_report"]
-
-                    st.session_state.stage = "final_result"
-                    st.session_state.text_error = ""
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"An error occurred: {e}")
-
-    except Exception as e:
-        logger.error(f"An error occurred: {e}")
-        st.error(f"An error occurred: {e}")
+            #         st.session_state.messages.append(
+            #             {"role": "assistant", "content": final_report})
 
 
 def main():
 
     load_dotenv()
     init_state()
+# amazonq-ignore-next-line
 
     logging.basicConfig(
         level=LOGLEVEL,
@@ -311,14 +226,17 @@ def main():
 
     # Main stage
     st.session_state.text_spinner_placeholder = st.empty()
-    article_placeholder = st.empty()
 
     if st.session_state.stage == "initial_form":
         render_initial_form()
     elif st.session_state.stage == "outline_feedback":
-        render_outline_feedback(article_placeholder)
-    elif st.session_state.stage == "final_result":
-        render_final_result(article_placeholder)
+        render_outline_feedback()
+
+    # if st.button("Start Over"):
+    #     st.session_state.bedrock_deep_research = None
+    #     st.session_state.stage = "initial_form"
+
+    #     st.rerun()
 
 
 if __name__ == "__main__":

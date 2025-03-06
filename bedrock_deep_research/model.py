@@ -1,6 +1,9 @@
 import operator
+from datetime import datetime
 from typing import Annotated, List, TypedDict
 
+import pytz
+from langgraph.graph.message import AnyMessage, add_messages
 from pydantic import BaseModel, Field
 
 
@@ -49,6 +52,31 @@ class Outline(BaseModel):
         description="Sections of the article.",
     )
 
+    def render_outline(self) -> str:
+        sections_content = "\n".join(
+            f"{i+1}. {section.name}" for i, section in enumerate(self.sections)
+        )
+        return f"\nTitle: {self.title}\n\n{sections_content}"
+
+
+class Article(BaseModel):
+    title: str = Field(description="Title of the article")
+    date: str = Field(
+        description="Date of the article",
+        default=datetime.now(pytz.UTC).strftime("%Y-%m-%d"),
+    )
+    sections: List[Section] = Field(
+        description="List of sections in the article")
+
+    def render_section(self, section: Section) -> str:
+        return f"\n## {section.name}\n\n{section.content}"
+
+    def render_full_article(self) -> str:
+        sections_content = "\n".join(
+            self.render_section(section) for section in self.sections
+        )
+        return f"# {self.title}\n#### Date: {self.date}\n\n{sections_content}"
+
 
 class ArticleState(TypedDict):
     article_id: str
@@ -63,6 +91,8 @@ class ArticleState(TypedDict):
     feedback_on_report_plan: str
     final_report: str
     head_image_path: str
+
+    messages: Annotated[list[AnyMessage], add_messages]
 
 
 class ArticleInputState(TypedDict):

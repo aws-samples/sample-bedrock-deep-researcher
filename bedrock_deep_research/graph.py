@@ -1,7 +1,9 @@
 import logging
 
+from langchain_aws import ChatBedrock
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, START, StateGraph
+from langgraph.prebuilt import create_react_agent
 from langgraph.types import Command
 
 from .config import Configuration
@@ -78,8 +80,13 @@ class BedrockDeepResearch:
             initiate_final_section_writing,
             [FinalSectionsWriter.N],
         )
-        builder.add_edge(FinalSectionsWriter.N, ArticleHeadImageGenerator.N)
-        builder.add_edge(ArticleHeadImageGenerator.N, CompileFinalArticle.N)
+        builder.add_edge(CompletedSectionsFormatter.N,
+                         ArticleHeadImageGenerator.N)
+        builder.add_edge(ArticleHeadImageGenerator.N,
+                         CompileFinalArticle.N)
+
+        builder.add_edge(FinalSectionsWriter.N, CompileFinalArticle.N)
+        # builder.add_edge(ArticleHeadImageGenerator.N, CompileFinalArticle.N)
         builder.add_edge(CompileFinalArticle.N, END)
 
         memory = MemorySaver()
@@ -92,7 +99,7 @@ class BedrockDeepResearch:
         logger.debug(f"Starting workflow with topic: {topic}")
 
         return self.graph.invoke(
-            {"topic": topic}, self.config, stream_mode="updates"
+            {"topic": topic}, self.config
         )
 
     def feedback(self, feedback):
@@ -101,7 +108,16 @@ class BedrockDeepResearch:
         logger.info(f"Feedback received: {feedback}")
 
         return self.graph.invoke(
-            Command(resume=feedback), self.config, stream_mode="updates"
+            Command(resume=feedback), self.config
+        )
+
+    def stream(self, message):
+        """Provides feedback to the workflow."""
+
+        logger.info(f"Message received: {message}")
+
+        return self.graph.stream(
+            Command(resume=message), self.config, stream_mode="messages"
         )
 
     def get_state(self):

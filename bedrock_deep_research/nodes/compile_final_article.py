@@ -30,4 +30,4 @@ class CompileFinalArticle:
         all_sections += "\n\n".join(
             [f"## {s.name}\n{s.content}" for s in sections])
 
-        return {"final_report": all_sections, "sections": sections}
+        return {"final_report": all_sections, "sections": sections, "messages": [("ai", all_sections)]}

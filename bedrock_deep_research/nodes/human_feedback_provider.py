@@ -1,11 +1,16 @@
+import logging
 from typing import Literal
 
 from langchain_core.runnables import RunnableConfig
 from langgraph.constants import Send
 from langgraph.types import Command, interrupt
 
+from bedrock_deep_research.config import Configuration
+
 from ..model import ArticleState
 from .article_outline_generator import ArticleOutlineGenerator
+
+logger = logging.getLogger(__name__)
 
 
 class HumanFeedbackProvider:
@@ -18,20 +23,16 @@ class HumanFeedbackProvider:
 
         # Get sections
         sections = state["sections"]
-        sections_str = "\n\n".join(
-            f"Section: {section.name}\n"
-            f"Description: {section.description}\n"
-            f"Research needed: {'Yes' if section.research else 'No'}\n"
-            for section in sections
-        )
+        outline = state["messages"][-1]
+
+        # Get configuration
+        configurable = Configuration.from_runnable_config(config)
 
         feedback = interrupt(
-            f"Please provide feedback on the following article outline. \n\n{sections_str}\n\n Does the report plan meet your needs? Pass 'true' to approve the report plan or provide feedback to regenerate the report plan:"
+            f"Please provide feedback on the following article outline. \n\n{outline.content}\n\n Are the article outline and title meeting your needs? Pass 'ok' to approve it or provide feedback to regenerate it:"
         )
 
-        # If the user approves the report plan, kick off section writing
-        # if isinstance(feedback, bool) and feedback is True:
-        if isinstance(feedback, bool):
+        if feedback == "ok":
             # Treat this as approve and kick off section writing
             return Command(
                 goto=[
@@ -45,13 +46,11 @@ class HumanFeedbackProvider:
             )
 
         # If the user provides feedback, regenerate the report plan
-        elif isinstance(feedback, str):
+        else:
+
+            feedback = f"<user feedback>{feedback}</user feedback> <Original Outline>{outline.content}</Original Outline>"
             # treat this as feedback
             return Command(
                 goto=ArticleOutlineGenerator.N,
                 update={"feedback_on_report_plan": feedback},
-            )
-        else:
-            raise TypeError(
-                f"Interrupt value of type {type(feedback)} is not supported."
             )
