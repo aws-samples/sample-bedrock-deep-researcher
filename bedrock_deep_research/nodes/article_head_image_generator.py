@@ -28,7 +28,7 @@ class ImageError(Exception):
         self.message = message
 
 
-@exponential_backoff_retry(Exception, max_retries=10)
+@exponential_backoff_retry(ClientError, max_retries=10)
 def generate_image(model_id, body):
     """
     Generate an image using Amazon Nova Canvas model on demand.
@@ -44,7 +44,6 @@ def generate_image(model_id, body):
 
     accept = "application/json"
     content_type = "application/json"
-
     response = bedrock.invoke_model(
         body=body, modelId=model_id, accept=accept, contentType=content_type
     )
@@ -143,7 +142,6 @@ class ArticleHeadImageGenerator:
             logger.error("A bedrock client error occurred:", message)
         except Exception as e:
             logger.error(
-
                 "An error occurred during ArticleHeadImageGenerator:", e)
 
         logger.info("Generated head image: %s", image_path)

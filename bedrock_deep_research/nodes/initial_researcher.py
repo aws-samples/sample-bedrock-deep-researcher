@@ -2,6 +2,7 @@ import asyncio
 import logging
 from typing import List
 
+from botocore.exceptions import ClientError
 from langchain_aws import ChatBedrock
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.runnables import RunnableConfig
@@ -61,7 +62,7 @@ class InitialResearcher:
 
         return {"source_str": source_str}
 
-    @exponential_backoff_retry(Exception, max_retries=10)
+    @exponential_backoff_retry(ClientError, max_retries=10)
     def generate_search_queries(self, model_id: str, max_tokens: int, system_prompt: str, user_prompt: str) -> List[str]:
         planner_model = ChatBedrock(
             model_id=model_id, max_tokens=max_tokens)

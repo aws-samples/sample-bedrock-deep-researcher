@@ -1,6 +1,7 @@
 import logging
 from typing import List, Literal
 
+from botocore.exceptions import ClientError
 from langchain_aws import ChatBedrock
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.runnables import RunnableConfig
@@ -155,7 +156,7 @@ class SectionWriter:
                 goto=SectionWebResearcher.N,
             )
 
-    @exponential_backoff_retry(Exception, max_retries=10)
+    @exponential_backoff_retry(ClientError, max_retries=10)
     def _generate_section_content(
         self,
         model: ChatBedrock,
@@ -183,7 +184,7 @@ class SectionWriter:
 
         return section_content.content
 
-    @exponential_backoff_retry(Exception, max_retries=10)
+    @exponential_backoff_retry(ClientError, max_retries=10)
     def _grade_section_content(
         self, model: ChatBedrock, system_prompt: str, section: Section
     ) -> Feedback:

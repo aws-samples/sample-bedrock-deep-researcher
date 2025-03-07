@@ -1,5 +1,6 @@
 import logging
 
+from botocore.client import ClientError
 from langchain_aws import ChatBedrock
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.runnables import RunnableConfig
@@ -54,7 +55,7 @@ class SectionSearchQueryGenerator:
         return {"search_queries": queries.queries}
 
 
-@exponential_backoff_retry(Exception, max_retries=10)
+@exponential_backoff_retry(ClientError, max_retries=10)
 def generate_section_queries(configurable: Configuration, section: Section) -> Queries:
     planner_model = ChatBedrock(
         model_id=configurable.planner_model, max_tokens=configurable.max_tokens

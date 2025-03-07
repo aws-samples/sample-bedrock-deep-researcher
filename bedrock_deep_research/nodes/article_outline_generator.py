@@ -67,7 +67,6 @@ class ArticleOutlineGenerator:
         outline = self.generate_outline(
             configurable.planner_model, configurable.max_tokens, system_prompt, user_prompt)
 
-
         logger.info(f"Generated sections: {outline.sections}")
         sections = [
             Section(section_number=i, name=section.name,
