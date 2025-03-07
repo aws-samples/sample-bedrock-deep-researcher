@@ -1,3 +1,4 @@
+from botocore.exceptions import ClientError
 from langchain_aws import ChatBedrock
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.runnables import RunnableConfig
@@ -87,7 +88,7 @@ class FinalSectionsWriter:
 
         return {"completed_sections": [section]}
 
-    @exponential_backoff_retry(Exception, max_retries=10)
+    @exponential_backoff_retry(ClientError, max_retries=10)
     def _generate_final_sections(
         self,
         model: ChatBedrock,

@@ -13,6 +13,7 @@ from pydantic import BaseModel, Field
 from bedrock_deep_research import BedrockDeepResearch
 from bedrock_deep_research.config import DEFAULT_TOPIC, SUPPORTED_MODELS, Configuration
 from bedrock_deep_research.model import Section
+from bedrock_deep_research.utils import CustomError
 
 logger = logging.getLogger(__name__)
 LOGLEVEL = os.environ.get("LOGLEVEL", "INFO").upper()
@@ -146,20 +147,28 @@ def render_initial_form():
                     with st.spinner(
                         "Please wait while the article outline is being generated..."
                     ):
-                        response = st.session_state.bedrock_deep_research.start(
-                            topic)
+                        try:
+                            response = st.session_state.bedrock_deep_research.start(
+                                topic)
+                        except CustomError as e:
+                            logger.error(f"Bedrock ClientError: {e}")
+                            raise e
 
-                        logger.debug(f"Outline response: {response}")
+                        except Exception as e:
+                            logger.error(
+                                f"An error occurred while creating the outline: {e}")
+                            raise e
+                        else:
+                            logger.debug(f"Outline response: {response}")
+                            state = st.session_state.bedrock_deep_research.get_state()
 
-                        state = st.session_state.bedrock_deep_research.get_state()
-
-                        article = Article(
-                            title=state.values["title"],
-                            sections=state.values["sections"],
-                        )
-                        st.session_state.article = article.render_outline()
-                        st.session_state.stage = "outline_feedback"
-                        st.rerun()
+                            article = Article(
+                                title=state.values["title"],
+                                sections=state.values["sections"],
+                            )
+                            st.session_state.article = article.render_outline()
+                            st.session_state.stage = "outline_feedback"
+                            st.rerun()
     except Exception as e:
         logger.error(f"An error occurred: {e}")
         raise
@@ -288,7 +297,7 @@ def on_accept_outline_button_click():
                     st.session_state.text_error = ""
                     st.rerun()
                 except Exception as e:
-                    st.error(f"An error occurred: {e}")
+                    st.error(f"An error occurred in article creation: {e}")
 
     except Exception as e:
         logger.error(f"An error occurred: {e}")
