@@ -117,7 +117,9 @@ def render_initial_form():
 
                         logger.info(
                             f"render_initial_form: Last message: {last_message.content}")
-                        st.markdown(last_message.content)
+                        st.markdown(
+                            last_message.content + "\n**Please provide feedback on the article outline or type 'ok' to proceed with the writing**")
+
                         st.session_state.messages.append(
                             {"role": "assistant", "content": last_message.content})
 
@@ -127,8 +129,6 @@ def render_initial_form():
                         #         st.session_state.messages = [
                         #             {"role": "assistant", "content": interrupt_obj[0].value}]
                         #         break
-
-                        logger.info(f"Outline response: {result}")
 
                         st.session_state.stage = "outline_feedback"
                         st.rerun()

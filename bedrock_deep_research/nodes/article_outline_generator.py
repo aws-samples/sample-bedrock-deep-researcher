@@ -65,7 +65,7 @@ class ArticleOutlineGenerator:
         outline = self.generate_outline(
             configurable.planner_model, configurable.max_tokens, system_prompt, user_prompt)
 
-        logger.info(f"Generated sections: {outline.sections}")
+        # logger.info(f"Generated sections: {outline.sections}")
         sections = [
             Section(section_number=i, name=section.name,
                     description=section.description)
@@ -73,7 +73,7 @@ class ArticleOutlineGenerator:
         ]
         # Set the first and the last section research as false.
         sections[-1].research, sections[0].research = False, False
-        logger.info(f"Sections -> {sections}")
+        # logger.info(f"Sections -> {sections}")
 
         return {"title": outline.title, "sections": sections, "messages": [("ai", outline.render_outline())]}
 
