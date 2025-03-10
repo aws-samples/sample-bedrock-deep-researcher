@@ -31,14 +31,23 @@ class Section(BaseModel):
         description="Name for this section of the report.",
     )
     description: str = Field(
-        description="Brief overview of the main topics and concepts to be covered in this section.",
+        description="Brief overview of the main topics and concepts to be covered in this section.", default=""
     )
     research: bool = Field(
-        description="Whether to perform web research for this section of the report."
+        description="Whether to perform web research for this section of the report.", default=True
     )
-    content: str = Field(description="The content of the section.")
+    content: str = Field(description="The content of the section.", default="")
     sources: List[Source] = Field(
         description="List of sources for this section.", default=[]
+    )
+
+
+class OutlineSection(BaseModel):
+    name: str = Field(
+        description="Name for this section of the report.",
+    )
+    description: str = Field(
+        description="Brief overview of the main topics and concepts to be covered in this section.",
     )
 
 
@@ -48,38 +57,53 @@ class Outline(BaseModel):
     title: str = Field(
         description="Title of the article.",
     )
-    sections: List[Section] = Field(
+    sections: List[OutlineSection] = Field(
         description="Sections of the article.",
     )
 
     def render_outline(self) -> str:
         sections_content = "\n".join(
-            f"{i+1}. {section.name}" for i, section in enumerate(self.sections)
-        )
+            f"**{i+1}. {section.name}**\n\n{section.description}\n" for i, section in enumerate(self.sections))
+
         return f"\nTitle: {self.title}\n\n{sections_content}"
 
 
 class Article(BaseModel):
     title: str = Field(description="Title of the article")
-    date: str = Field(
-        description="Date of the article",
-        default=datetime.now(pytz.UTC).strftime("%Y-%m-%d"),
-    )
     sections: List[Section] = Field(
         description="List of sections in the article")
 
+    def render_outline(self) -> str:
+        """Render the article outline."""
+        sections_content = "\n".join(
+            f"{i + 1}. {section.name}" for i, section in enumerate(self.sections)
+        )
+        return f"\nTitle: **{self.title}**\n\n{sections_content}"
+
     def render_section(self, section: Section) -> str:
+        """Render a single section."""
         return f"\n## {section.name}\n\n{section.content}"
 
     def render_full_article(self) -> str:
+        """Render the full article with all sections."""
         sections_content = "\n".join(
             self.render_section(section) for section in self.sections
         )
-        return f"# {self.title}\n#### Date: {self.date}\n\n{sections_content}"
+        return (
+            f"# {self.title}\n#### Date: {self._get_date_today()}\n\n{sections_content}"
+        )
+
+    @staticmethod
+    def _get_date_today() -> str:
+        """Get today's date in UTC."""
+        return datetime.now(pytz.UTC).strftime("%Y-%m-%d")
+
+    def __str__(self) -> str:
+        """String representation of the article."""
+        return self.render_outline()
 
 
 class ArticleState(TypedDict):
-    article_id: str
     topic: str
     title: str
     sections: list[Section]

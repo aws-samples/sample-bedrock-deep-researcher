@@ -1,6 +1,5 @@
 import asyncio
 import logging
-import uuid
 from typing import List
 
 from langchain_aws import ChatBedrock
@@ -60,7 +59,7 @@ class InitialResearcher:
             search_results, max_tokens_per_source=1000, include_raw_content=False
         )
 
-        return {"article_id": str(uuid.uuid4()), "source_str": source_str}
+        return {"source_str": source_str}
 
     @exponential_backoff_retry(Exception, max_retries=10)
     def generate_search_queries(self, model_id: str, max_tokens: int, system_prompt: str, user_prompt: str) -> List[str]:

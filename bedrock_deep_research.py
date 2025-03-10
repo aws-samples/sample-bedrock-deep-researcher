@@ -22,7 +22,7 @@ default_st_vals = {
     "bedrock_deep_research": None,
     "stage": "initial_form",
     "article": "",
-    "text_error": ""
+    "text_error": "",
 }
 
 
