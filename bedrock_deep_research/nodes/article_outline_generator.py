@@ -1,4 +1,3 @@
-import json
 import logging
 
 from langchain_aws import ChatBedrock
@@ -6,7 +5,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.runnables import RunnableConfig
 
 from ..config import Configuration
-from ..model import ArticleState, Outline
+from ..model import ArticleState, Outline, Section
 
 logger = logging.getLogger(__name__)
 
@@ -18,10 +17,7 @@ system_prompt = """You are an expert technical writer tasked to plan an article 
 3. Design a logical progression of sections with descriptive headings
 4. Each section should have the fields:
     - name: Concise, descriptive section heading
-    - section_number: Sequential integer for ordering
     - description: Brief summary of section content (2-3 sentences)
-    - research: Boolean value (true/false) indicating if web research is needed
-    - content: Empty string (to be filled later)
 5. Introduction and conclusion will not require research because they can distill information from other parts of the article.
 6. If a feedback is provided, use it to improve the outline or the title.
 7. Return the title and sections as a valid JSON object without any additional text.
@@ -51,7 +47,7 @@ Use this context to plan the sections of the article:
 class ArticleOutlineGenerator:
     N = "generate_article_outline"
 
-    async def __call__(self, state: ArticleState, config: RunnableConfig):
+    def __call__(self, state: ArticleState, config: RunnableConfig):
         logging.info("Generating report plan")
 
         topic = state.get("topic", "")
@@ -68,24 +64,26 @@ class ArticleOutlineGenerator:
             context=source_str,
             feedback=feedback,
         )
-        outline_response = self.generate_outline(
+        outline = self.generate_outline(
             configurable.planner_model, configurable.max_tokens, system_prompt, user_prompt)
 
-        outline_obj = json.loads(outline_response.content)
-
-        logger.info(f"Outline json: {outline_obj}")
-
-        outline = Outline.model_validate(outline_obj, strict=True)
 
         logger.info(f"Generated sections: {outline.sections}")
-
-        return {"title": outline.title, "sections": outline.sections}
+        sections = [
+            Section(section_number=i, name=section.name,
+                    description=section.description)
+            for i, section in enumerate(outline.sections)
+        ]
+        # Set the first and the last section research as false.
+        sections[-1].research, sections[0].research = False, False
+        logger.info(f"Sections -> {sections}")
+        return {"title": outline.title, "sections": sections}
 
     def generate_outline(self, model_id: str, max_tokens: int, system_prompt: str, user_prompt: str):
 
         planner_model = ChatBedrock(
-            model_id=model_id, max_tokens=max_tokens)
-        # ).with_structured_output(Outline)
+            model_id=model_id, max_tokens=max_tokens
+        ).with_structured_output(Outline)
 
         return planner_model.invoke(
             [SystemMessage(content=system_prompt)]

@@ -5,26 +5,14 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.types import Command
 
 from .config import Configuration
-from .model import (
-    ArticleInputState,
-    ArticleOutputState,
-    ArticleState,
-    SectionOutputState,
-    SectionState,
-)
-from .nodes import (
-    ArticleHeadImageGenerator,
-    ArticleOutlineGenerator,
-    CompileFinalArticle,
-    CompletedSectionsFormatter,
-    FinalSectionsWriter,
-    HumanFeedbackProvider,
-    InitialResearcher,
-    SectionSearchQueryGenerator,
-    SectionWebResearcher,
-    SectionWriter,
-    initiate_final_section_writing,
-)
+from .model import (ArticleInputState, ArticleOutputState, ArticleState,
+                    SectionOutputState, SectionState)
+from .nodes import (ArticleHeadImageGenerator, ArticleOutlineGenerator,
+                    CompileFinalArticle, CompletedSectionsFormatter,
+                    FinalSectionsWriter, HumanFeedbackProvider,
+                    InitialResearcher, SectionSearchQueryGenerator,
+                    SectionWebResearcher, SectionWriter,
+                    initiate_final_section_writing)
 from .web_search import WebSearch
 
 logger = logging.getLogger(__name__)
@@ -98,21 +86,21 @@ class BedrockDeepResearch:
 
         return builder.compile(checkpointer=memory)
 
-    async def start(self, topic: str):
+    def start(self, topic: str):
         """Starts the workflow with the given topic."""
 
         logger.debug(f"Starting workflow with topic: {topic}")
 
-        return await self.graph.ainvoke(
+        return self.graph.invoke(
             {"topic": topic}, self.config, stream_mode="updates"
         )
 
-    async def feedback(self, feedback):
+    def feedback(self, feedback):
         """Provides feedback to the workflow."""
 
         logger.info(f"Feedback received: {feedback}")
 
-        return await self.graph.ainvoke(
+        return self.graph.invoke(
             Command(resume=feedback), self.config, stream_mode="updates"
         )
 

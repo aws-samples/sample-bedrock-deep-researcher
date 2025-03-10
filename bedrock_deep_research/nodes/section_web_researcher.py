@@ -1,3 +1,4 @@
+import asyncio
 import logging
 
 from langchain_core.runnables import RunnableConfig
@@ -17,7 +18,7 @@ class SectionWebResearcher:
     def __init__(self, web_search: WebSearch):
         self.web_search = web_search
 
-    async def __call__(self, state: SectionState, config: RunnableConfig):
+    def __call__(self, state: SectionState, config: RunnableConfig):
         """Search the web for each query, then return a list of raw sources and a formatted string of sources."""
 
         # Get state
@@ -26,7 +27,9 @@ class SectionWebResearcher:
         # Web search
         try:
             logger.debug(f"Search Queries: {search_queries}")
-            search_results = await self.web_search.search(search_queries)
+
+            search_results = asyncio.run(
+                self.web_search.search(search_queries))
 
             source_str = format_web_search(
                 search_results, max_tokens_per_source=5000, include_raw_content=False
