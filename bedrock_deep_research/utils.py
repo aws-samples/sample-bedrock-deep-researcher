@@ -45,7 +45,7 @@ def exponential_backoff_retry(
                         # Do not try max_retry times
                         attempt = max_retries
                         raise CustomError(
-                            message="Expired Token. Please update the AWS credentials you used to connect to the boto Client.")
+                            message="Expired Token. Please update the AWS credentials, to connect to the boto Client.")
                     elif e.response['Error']['Code'] == 'ThrottlingException':
                         if attempt == max_retries:
                             logger.error(
@@ -106,21 +106,3 @@ def extract_xml_content(text: str, tag_name: str) -> str | None:
         return match.group(1).strip()
     else:
         return None
-
-
-def get_context_window(model_id: str) -> int:
-    if "claude-3-5" in model_id:
-        return 200000
-    elif "llama3-1" in model_id or "llama3-2" in model_id:
-        return 128000
-    elif "llama3" in model_id:
-        return 8000
-    else:
-        return 4096
-
-
-def get_max_tokens(model_id: str) -> int:
-    if "claude" in model_id or "llama3-1" in model_id or "llama3-2" in model_id:
-        return 4096
-    else:
-        return 2048
