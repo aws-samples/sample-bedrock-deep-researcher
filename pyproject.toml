@@ -1,35 +1,32 @@
-[tool.poetry]
+[project]
 name = "bedrock_deep_research"
 version = "0.1.0"
 description = "Bedrock Agentic AI Deep Researcher"
 authors = [
-    "Lorenzo Micheli <miclor@amazon.com>", 
-    "Akarsha Sehwag <akshseh@amazon.de>",
+    {name = "Lorenzo Micheli", email = "miclor@amazon.com"},
+    {name = "Akarsha Sehwag", email = "akshseh@amazon.de"},
 ]
 readme = "README.md"
-package-mode = false
+requires-python = "<4.0,>=3.12"
+dependencies = [
+    "langgraph<1.0.0,>=0.2.44",
+    "langchain-aws==0.2.14",
+    "langchain<1.0.0,>=0.3.7",
+    "python-dotenv<2.0.0,>=1.0.1",
+    "langgraph-checkpoint-sqlite<3.0.0,>=2.0.1",
+    "tavily-python<1.0.0,>=0.5.0",
+    "pydantic<3.0.0,>=2.9.2",
+    "watchdog<7.0.0,>=6.0.0",
+    "beautifulsoup4<5.0.0,>=4.12.3",
+    "langchain-community<1.0.0,>=0.3.8",
+    "streamlit==1.42.2",
+    "pyperclip<2.0.0,>=1.9.0",
+]
 
-[tool.poetry.dependencies]
-python = "^3.12"
-langgraph = "^0.2.44"
-langchain-aws = "0.2.14"
-langchain = "^0.3.7"
-python-dotenv = "^1.0.1"
-langgraph-checkpoint-sqlite = "^2.0.1"
-tavily-python = "^0.5.0"
-pydantic = "^2.9.2"
-watchdog = "^6.0.0"
-beautifulsoup4 = "^4.12.3"
-langchain-community = "^0.3.8"
-streamlit = "1.42.2"
-pyperclip = "^1.9.0"
-
-[tool.poetry.group.dev.dependencies]
-pytest = "^8.3.3"
-ipykernel = "^6.29.5"
-pytest-cov = "^6.0.0"
-bandit = "^1.8.0"
-
-[build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+[dependency-groups]
+dev = [
+    "pytest<9.0.0,>=8.3.3",
+    "ipykernel<7.0.0,>=6.29.5",
+    "pytest-cov<7.0.0,>=6.0.0",
+    "bandit<2.0.0,>=1.8.0",
+]
