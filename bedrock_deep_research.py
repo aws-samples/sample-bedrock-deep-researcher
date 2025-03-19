@@ -1,11 +1,9 @@
-import asyncio
 import logging
 import os
 import uuid
 from datetime import datetime
 from typing import List
 
-import nest_asyncio
 import pyperclip
 import pytz
 import streamlit as st
@@ -13,47 +11,56 @@ from dotenv import load_dotenv
 from pydantic import BaseModel, Field
 
 from bedrock_deep_research import BedrockDeepResearch
-from bedrock_deep_research.config import (DEFAULT_TOPIC, SUPPORTED_MODELS,
-                                          Configuration)
+from bedrock_deep_research.config import DEFAULT_TOPIC, SUPPORTED_MODELS, Configuration
 from bedrock_deep_research.model import Section
+from bedrock_deep_research.utils import CustomError
 
 logger = logging.getLogger(__name__)
 LOGLEVEL = os.environ.get("LOGLEVEL", "INFO").upper()
 
-nest_asyncio.apply()
 
 default_st_vals = {
     "head_image_path": None,
     "bedrock_deep_research": None,
     "stage": "initial_form",
     "article": "",
-    "text_error": ""
+    "text_error": "",
 }
 
 
 class Article(BaseModel):
     title: str = Field(description="Title of the article")
-    date: str = Field(
-        description="Date of the article",
-        default=datetime.now(pytz.UTC).strftime("%Y-%m-%d"),
-    )
     sections: List[Section] = Field(
         description="List of sections in the article")
 
     def render_outline(self) -> str:
+        """Render the article outline."""
         sections_content = "\n".join(
-            f"{i+1}. {section.name}" for i, section in enumerate(self.sections)
+            f"**{i + 1}. {section.name}**\n\n{section.description}\n" for i, section in enumerate(self.sections)
         )
-        return f"\nTitle: {self.title}\n\n{sections_content}"
+        return f"### {self.title}\n\n{sections_content}"
 
     def render_section(self, section: Section) -> str:
+        """Render a single section."""
         return f"\n## {section.name}\n\n{section.content}"
 
     def render_full_article(self) -> str:
+        """Render the full article with all sections."""
         sections_content = "\n".join(
             self.render_section(section) for section in self.sections
         )
-        return f"# {self.title}\n#### Date: {self.date}\n\n{sections_content}"
+        return (
+            f"# {self.title}\n#### Date: {self._get_date_today()}\n\n{sections_content}"
+        )
+
+    @staticmethod
+    def _get_date_today() -> str:
+        """Get today's date in UTC."""
+        return datetime.now(pytz.UTC).strftime("%Y-%m-%d")
+
+    def __str__(self) -> str:
+        """String representation of the article."""
+        return self.render_outline()
 
 
 def init_state():
@@ -67,10 +74,7 @@ def render_initial_form():
     """
     Renders the initial form for article generation with topic and writing_guidelines inputs.
     """
-    loop = None
     try:
-        loop = asyncio.get_event_loop()
-
         with st.form("article_form"):
             topic = st.text_area(
                 "Topic",
@@ -143,28 +147,31 @@ def render_initial_form():
                     with st.spinner(
                         "Please wait while the article outline is being generated..."
                     ):
-                        response = loop.run_until_complete(
-                            st.session_state.bedrock_deep_research.start(topic)
-                        )
+                        try:
+                            response = st.session_state.bedrock_deep_research.start(
+                                topic)
+                        except CustomError as e:
+                            logger.error(f"Bedrock ClientError: {e}")
+                            raise e
 
-                        logger.debug(f"Outline response: {response}")
+                        except Exception as e:
+                            logger.error(
+                                f"An error occurred while creating the outline: {e}")
+                            raise e
+                        else:
+                            logger.debug(f"Outline response: {response}")
+                            state = st.session_state.bedrock_deep_research.get_state()
 
-                        state = st.session_state.bedrock_deep_research.get_state()
-
-                        article = Article(
-                            title=state.values["title"],
-                            sections=state.values["sections"],
-                        )
-                        st.session_state.article = article.render_outline()
-                        st.session_state.stage = "outline_feedback"
-                        st.rerun()
+                            article = Article(
+                                title=state.values["title"],
+                                sections=state.values["sections"],
+                            )
+                            st.session_state.article = article.render_outline()
+                            st.session_state.stage = "outline_feedback"
+                            st.rerun()
     except Exception as e:
         logger.error(f"An error occurred: {e}")
         raise
-    finally:
-        # Clean up the event loop if it was created
-        if loop and not loop.is_closed():
-            loop.close()
 
 
 def render_outline_feedback(article_container):
@@ -210,8 +217,7 @@ def render_final_result(article_container):
     logger.info(st.session_state)
 
     with article_container.container():
-
-        if 'head_image_path' in st.session_state and st.session_state.head_image_path:
+        if "head_image_path" in st.session_state and st.session_state.head_image_path:
             st.image(st.session_state.head_image_path, width=1200)
 
         st.markdown(st.session_state.article)
@@ -238,9 +244,7 @@ def render_final_result(article_container):
 
 
 def on_submit_button_click(feedback):
-    loop = None
     try:
-        loop = asyncio.get_event_loop()
         logger.info("Submit feedback pressed")
         if not feedback:
             st.session_state.text_error = "Please enter a feedback"
@@ -249,10 +253,8 @@ def on_submit_button_click(feedback):
         with st.session_state.text_spinner_placeholder:
             with st.spinner("Please wait while your feedback is being processed"):
                 try:
-                    response = loop.run_until_complete(
-                        st.session_state.bedrock_deep_research.feedback(
-                            feedback)
-                    )
+                    response = st.session_state.bedrock_deep_research.feedback(
+                        feedback)
 
                     logger.info(f"Feedback response: {response}")
 
@@ -271,24 +273,18 @@ def on_submit_button_click(feedback):
     except Exception as e:
         logger.error(f"An error occurred: {e}")
         st.error(f"An error occurred: {e}")
-    finally:
-        if loop and not loop.is_closed():
-            loop.close()
 
 
 def on_accept_outline_button_click():
     logger.info("Accept outline pressed")
 
-    loop = None
     try:
-        loop = asyncio.get_event_loop()
         # if st.form_submit_button("Accept Outline", type="primary"):
         with st.session_state.text_spinner_placeholder:
             with st.spinner("Please wait while the article is being generated..."):
                 try:
-                    response = loop.run_until_complete(
-                        st.session_state.bedrock_deep_research.feedback(True)
-                    )
+                    response = st.session_state.bedrock_deep_research.feedback(
+                        True)
 
                     logger.info(f"Accept outline response: {response}")
 
@@ -301,14 +297,11 @@ def on_accept_outline_button_click():
                     st.session_state.text_error = ""
                     st.rerun()
                 except Exception as e:
-                    st.error(f"An error occurred: {e}")
+                    st.error(f"An error occurred in article creation: {e}")
 
     except Exception as e:
         logger.error(f"An error occurred: {e}")
         st.error(f"An error occurred: {e}")
-    finally:
-        if loop and not loop.is_closed():
-            loop.close()
 
 
 def main():

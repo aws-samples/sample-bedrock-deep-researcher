@@ -2,6 +2,7 @@ import base64
 import io
 import json
 import logging
+import time
 from pathlib import Path
 
 import boto3
@@ -27,7 +28,7 @@ class ImageError(Exception):
         self.message = message
 
 
-@exponential_backoff_retry(Exception, max_retries=10)
+@exponential_backoff_retry(ClientError, max_retries=10)
 def generate_image(model_id, body):
     """
     Generate an image using Amazon Nova Canvas model on demand.
@@ -43,7 +44,6 @@ def generate_image(model_id, body):
 
     accept = "application/json"
     content_type = "application/json"
-
     response = bedrock.invoke_model(
         body=body, modelId=model_id, accept=accept, contentType=content_type
     )
@@ -88,9 +88,12 @@ class ArticleHeadImageGenerator:
     N = "generate_head_image"
 
     def __call__(self, state: ArticleState, config: RunnableConfig):
-        article_id = state["article_id"]
         title = state["title"]
         sections = state["completed_sections"]
+        # Article ID comprises of first 4 words of the title and a hex timestamp in str format
+        # Title is capped to 40 chars to keep the length in check
+        article_id = ("_".join(title.split(" ")[:4])[:40] +
+                      "_" + hex(int(time.time()))[2:])
 
         image_path = ""
         try:
@@ -139,7 +142,6 @@ class ArticleHeadImageGenerator:
             logger.error("A bedrock client error occurred:", message)
         except Exception as e:
             logger.error(
-
                 "An error occurred during ArticleHeadImageGenerator:", e)
 
         logger.info("Generated head image: %s", image_path)

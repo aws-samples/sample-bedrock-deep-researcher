@@ -12,7 +12,6 @@ class CompileFinalArticle:
 
         # Get sections
         title = state["title"]
-        head_image_path = state["head_image_path"]
         sections = state["sections"]
         completed_sections = {
             s.name: s.content for s in state["completed_sections"]}
@@ -23,6 +22,7 @@ class CompileFinalArticle:
 
         all_sections = f"# {title}\n"
 
+        # head_image_path = state["head_image_path"]
         # if head_image_path:
         #     all_sections += f"![AI generated image]({head_image_path})\n\n"
 

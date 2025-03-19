@@ -28,14 +28,23 @@ class Section(BaseModel):
         description="Name for this section of the report.",
     )
     description: str = Field(
-        description="Brief overview of the main topics and concepts to be covered in this section.",
+        description="Brief overview of the main topics and concepts to be covered in this section.", default=""
     )
     research: bool = Field(
-        description="Whether to perform web research for this section of the report."
+        description="Whether to perform web research for this section of the report.", default=True
     )
-    content: str = Field(description="The content of the section.")
+    content: str = Field(description="The content of the section.", default="")
     sources: List[Source] = Field(
         description="List of sources for this section.", default=[]
+    )
+
+
+class OutlineSection(BaseModel):
+    name: str = Field(
+        description="Name for this section of the report.",
+    )
+    description: str = Field(
+        description="Brief overview of the main topics and concepts to be covered in this section.",
     )
 
 
@@ -45,13 +54,12 @@ class Outline(BaseModel):
     title: str = Field(
         description="Title of the article.",
     )
-    sections: List[Section] = Field(
+    sections: List[OutlineSection] = Field(
         description="Sections of the article.",
     )
 
 
 class ArticleState(TypedDict):
-    article_id: str
     topic: str
     title: str
     sections: list[Section]

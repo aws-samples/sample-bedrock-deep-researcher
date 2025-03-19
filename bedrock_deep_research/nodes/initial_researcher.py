@@ -1,7 +1,8 @@
+import asyncio
 import logging
-import uuid
 from typing import List
 
+from botocore.exceptions import ClientError
 from langchain_aws import ChatBedrock
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.runnables import RunnableConfig
@@ -34,7 +35,7 @@ class InitialResearcher:
     def __init__(self, web_search: WebSearch):
         self.web_search = web_search
 
-    async def __call__(self, state: ArticleInputState, config: RunnableConfig):
+    def __call__(self, state: ArticleInputState, config: RunnableConfig):
         logging.info("initial_research")
 
         topic = state["topic"]
@@ -53,15 +54,15 @@ class InitialResearcher:
 
         logger.info(f"Generated queries: {query_list}")
 
-        search_results = await self.web_search.search(query_list)
+        search_results = asyncio.run(self.web_search.search(query_list))
 
         source_str = format_web_search(
             search_results, max_tokens_per_source=1000, include_raw_content=False
         )
 
-        return {"article_id": str(uuid.uuid4()), "source_str": source_str}
+        return {"source_str": source_str}
 
-    @exponential_backoff_retry(Exception, max_retries=10)
+    @exponential_backoff_retry(ClientError, max_retries=10)
     def generate_search_queries(self, model_id: str, max_tokens: int, system_prompt: str, user_prompt: str) -> List[str]:
         planner_model = ChatBedrock(
             model_id=model_id, max_tokens=max_tokens)
